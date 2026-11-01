@@ -1,5 +1,5 @@
 {
-  "_comment": "Drop tables from https://hypixelskyblock.minecraft.wiki/w/White_Gift (and Green_Gift, Red_Gift, Party_Gift). One weighted roll per player; both the giver and the receiver get a roll. Snowman Pet assumed Legendary (unconfirmed). Skill XP Boost potions are skill-specific with no auction market. 'extras' are separate rolls on top of the table (North Stars can't be sold: shown, not counted).",
+  "_comment": "Drop tables from https://hypixelskyblock.minecraft.wiki/w/White_Gift (and Green_Gift, Red_Gift, Party_Gift). One weighted roll per player; both the giver and the receiver get a roll. Snowman Pet is Legendary (confirmed in-game). Skill XP Boost potions are skill-specific with no auction market. 'extras' are separate rolls on top of the table (North Stars can't be sold: shown, not counted).",
   "tables": [
     {
       "id": "WHITE_GIFT",

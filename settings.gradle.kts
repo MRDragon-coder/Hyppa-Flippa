@@ -9,6 +9,8 @@ pluginManagement {
         // Applied per Minecraft version in build.gradle.kts. 26.x is unobfuscated, so this is the
         // no-mappings variant of Loom.
         id("net.fabricmc.fabric-loom") version "1.17-SNAPSHOT"
+        // Uploads releases to Modrinth (`./gradlew publishMods`).
+        id("me.modmuss50.mod-publish-plugin") version "2.2.1"
     }
 }
 

@@ -8,11 +8,12 @@
 		"MRDragon-coder"
 	],
 	"contact": {
-		"sources": "https://github.com/MRDragon-coder/Hyppa-Flippa"
+		"sources": "https://github.com/MRDragon-coder/Hyppa-Flippa",
+		"issues": "https://github.com/MRDragon-coder/Hyppa-Flippa/issues"
 	},
 	"license": "MIT",
 	"icon": "assets/hypaflippa/icon.png",
-	"environment": "*",
+	"environment": "client",
 	"entrypoints": {
 		"main": [
 			"com.hypaflippa.HypaFlippa"

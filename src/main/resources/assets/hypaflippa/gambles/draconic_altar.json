@@ -1,5 +1,5 @@
 {
-  "_comment": "From https://hypixelskyblock.minecraft.wiki/w/Draconic_Altar. Always sacrifices Dragon Boots crafted from 40 fragments (smallest piece = most bonus rolls per fragment). Bonus fragments are assumed to be the same type as the boots (unconfirmed) and are reused for the next boots. Mythic Endermite 'Sacrificer' adds 0.1 percentage point per level (55% at level 100, confirmed by the user).",
+  "_comment": "From https://hypixelskyblock.minecraft.wiki/w/Draconic_Altar. Always sacrifices Dragon Boots crafted from 40 fragments (smallest piece = most bonus rolls per fragment). Bonus fragments are the same type as the boots (confirmed in-game) and are reused for the next boots. Mythic Endermite 'Sacrificer' adds 0.1 percentage point per level (55% at level 100, confirmed by the user).",
   "fragmentsPerBoots": 40,
   "baseBonusChance": 0.45,
   "bonusChancePerPetLevel": 0.001,

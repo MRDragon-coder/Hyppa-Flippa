@@ -1,0 +1,51 @@
+name: Bug report
+description: Something doesn't work or shows wrong numbers
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting! The more of this you fill in, the faster it can be fixed.
+  - type: input
+    id: mod-version
+    attributes:
+      label: Hypa Flippa version
+      description: Shown in Mod Menu, or in the jar's file name.
+      placeholder: 1.0.1
+    validations:
+      required: true
+  - type: dropdown
+    id: minecraft-version
+    attributes:
+      label: Minecraft version
+      options:
+        - "26.2"
+        - "26.1.2"
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what happened instead? Screenshots help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How can it be reproduced?
+      placeholder: |
+        1. Open the bazaar
+        2. Click the NPC page
+        3. ...
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: |
+        Your `logs/latest.log` (in your Minecraft folder), or at least the lines mentioning
+        `hypaflippa`. Upload the file or paste it into https://mclo.gs and link it here.
+  - type: textarea
+    id: other-mods
+    attributes:
+      label: Other mods
+      description: Optional. Other SkyBlock mods you use (SkyHanni, Skyblocker, ...).

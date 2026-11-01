@@ -3,6 +3,7 @@
 // stonecutter.properties.toml for that version.
 plugins {
     id("net.fabricmc.fabric-loom")
+    id("me.modmuss50.mod-publish-plugin")
 }
 
 val modId: String = sc.properties["mod.id"]
@@ -76,5 +77,44 @@ tasks {
         description = "Builds the mod jar and copies it to build/libs/<mod version>/ in the root project"
         from(named<Jar>("jar").flatMap { it.archiveFile })
         into(rootProject.layout.buildDirectory.dir("libs/$modVersion"))
+    }
+}
+
+// --- Releasing: `./gradlew publishMods` uploads every version's jar to Modrinth.
+//
+// Needs a Modrinth token (modrinth.com/settings/pats, scopes: create/read/write versions) in
+// your user-wide ~/.gradle/gradle.properties as `modrinth.token=...`, or in the MODRINTH_TOKEN
+// environment variable. Never put it in this project. Without a token, or without
+// publish.modrinth_id in stonecutter.properties.toml, it only does a dry run: the upload is
+// prepared in build/publishMods/ but nothing is sent.
+
+val modrinthToken = providers.gradleProperty("modrinth.token").orElse(providers.environmentVariable("MODRINTH_TOKEN"))
+val modrinthId: String = sc.properties["publish.modrinth_id"]
+
+// The changelog of this release: the "## <mod version>" section of CHANGELOG.md.
+val releaseNotes = providers.provider {
+    val text = rootProject.file("CHANGELOG.md").readText()
+    val heading = Regex("^## ${Regex.escape(modVersion)}\\b.*$", RegexOption.MULTILINE).find(text)
+        ?: error("CHANGELOG.md has no \"## $modVersion\" section")
+    val rest = text.substring(heading.range.last + 1)
+    val end = Regex("^## ", RegexOption.MULTILINE).find(rest)?.range?.first ?: rest.length
+    rest.substring(0, end).trim()
+}
+
+publishMods {
+    file.set(tasks.jar.flatMap { it.archiveFile })
+    changelog.set(releaseNotes)
+    type.set(STABLE)
+    version.set(project.version.toString())
+    displayName.set("${sc.properties.get<String>("mod.name")} $modVersion for ${sc.current.version}")
+    modLoaders.add("fabric")
+    dryRun.set(modrinthToken.map { false }.orElse(true).map { it || modrinthId.isBlank() })
+
+    modrinth {
+        projectId.set(modrinthId)
+        accessToken.set(modrinthToken)
+        minecraftVersions.add(sc.current.version)
+        environment.set(CLIENT_ONLY)
+        requires("fabric-api")
     }
 }

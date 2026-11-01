@@ -1,0 +1,15 @@
+name: Feature request
+description: An idea for something Hypa Flippa could calculate or show
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like?
+      description: For example a gamble or flip it doesn't cover yet, or a change to the window.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why would it help?

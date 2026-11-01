@@ -24,3 +24,14 @@ Builds for Minecraft 26.1.2 and 26.2 from one codebase with
     ./gradlew buildAndCollect
 
 The jars end up in `build/libs/<mod version>/`.
+
+## Releasing
+
+1. Raise `mod.version` in `stonecutter.properties.toml` and add a matching `## <version>`
+   section to `CHANGELOG.md`.
+2. Run `./gradlew publishMods`. Without a Modrinth token (`modrinth.token` in your user-wide
+   `~/.gradle/gradle.properties`) this is a dry run that uploads nothing.
+
+## Bugs and ideas
+
+Please use [GitHub Issues](https://github.com/MRDragon-coder/Hyppa-Flippa/issues).
