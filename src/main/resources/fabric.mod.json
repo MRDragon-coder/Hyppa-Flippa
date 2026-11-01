@@ -3,12 +3,14 @@
 	"id": "${id}",
 	"version": "${version}",
 	"name": "${name}",
-	"description": "Hypixel SkyBlock flipping helper. Finds profitable Bazaar flips and shows them right on top of the Bazaar.",
+	"description": "Bazaar and NPC flips, plus the real profit of Jerry Boxes, gifts and the Draconic Altar, live from the Hypixel API.",
 	"authors": [
-		"Me!"
+		"MRDragon-coder"
 	],
-	"contact": {},
-	"license": "CC0-1.0",
+	"contact": {
+		"sources": "https://github.com/MRDragon-coder/Hyppa-Flippa"
+	},
+	"license": "MIT",
 	"icon": "assets/hypaflippa/icon.png",
 	"environment": "*",
 	"entrypoints": {
