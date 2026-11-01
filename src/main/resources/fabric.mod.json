@@ -1,0 +1,28 @@
+{
+	"schemaVersion": 1,
+	"id": "${id}",
+	"version": "${version}",
+	"name": "${name}",
+	"description": "Hypixel SkyBlock flipping helper. Finds profitable Bazaar flips and shows them right on top of the Bazaar.",
+	"authors": [
+		"Me!"
+	],
+	"contact": {},
+	"license": "CC0-1.0",
+	"icon": "assets/hypaflippa/icon.png",
+	"environment": "*",
+	"entrypoints": {
+		"main": [
+			"com.hypaflippa.HypaFlippa"
+		],
+		"client": [
+			"com.hypaflippa.client.HypaFlippaClient"
+		]
+	},
+	"depends": {
+		"fabricloader": ">=${loader}",
+		"minecraft": "${minecraft}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

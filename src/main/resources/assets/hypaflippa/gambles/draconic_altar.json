@@ -1,0 +1,23 @@
+{
+  "_comment": "From https://hypixelskyblock.minecraft.wiki/w/Draconic_Altar. Always sacrifices Dragon Boots crafted from 40 fragments (smallest piece = most bonus rolls per fragment). Bonus fragments are assumed to be the same type as the boots (unconfirmed) and are reused for the next boots. Mythic Endermite 'Sacrificer' adds 0.1 percentage point per level (55% at level 100, confirmed by the user).",
+  "fragmentsPerBoots": 40,
+  "baseBonusChance": 0.45,
+  "bonusChancePerPetLevel": 0.001,
+  "bonusFragments": { "weight": 81.93, "min": 15, "max": 20 },
+  "bonusItems": [
+    { "label": "Ritual Residue", "weight": 10.84, "item": "RITUAL_RESIDUE" },
+    { "label": "Summoning Eye", "weight": 4.82, "item": "SUMMONING_EYE" },
+    { "label": "Dragon Horn", "weight": 2.41, "item": "DRAGON_HORN" }
+  ],
+  "essenceItem": "ESSENCE_DRAGON",
+  "fragments": [
+    { "item": "YOUNG_FRAGMENT", "name": "Young Dragon Fragment", "bootsEssence": 20 },
+    { "item": "OLD_FRAGMENT", "name": "Old Dragon Fragment", "bootsEssence": 20 },
+    { "item": "STRONG_FRAGMENT", "name": "Strong Dragon Fragment", "bootsEssence": 20 },
+    { "item": "WISE_FRAGMENT", "name": "Wise Dragon Fragment", "bootsEssence": 20 },
+    { "item": "UNSTABLE_FRAGMENT", "name": "Unstable Dragon Fragment", "bootsEssence": 20 },
+    { "item": "PROTECTOR_FRAGMENT", "name": "Protector Dragon Fragment", "bootsEssence": 20 },
+    { "item": "SUPERIOR_FRAGMENT", "name": "Superior Dragon Fragment", "bootsEssence": 40 },
+    { "item": "HOLY_FRAGMENT", "name": "Holy Dragon Fragment", "bootsEssence": 30 }
+  ]
+}

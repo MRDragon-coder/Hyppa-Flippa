@@ -1,0 +1,16 @@
+# Shared by every Minecraft version.
+mod.id = "hypaflippa"
+mod.name = "Hypa Flippa"
+mod.group = "com.hypaflippa"
+mod.version = "1.0.0"
+
+deps.fabric_loader = "0.19.3"
+
+# Per Minecraft version.
+["26.1.2"]
+mod.mc_compat = "~26.1.2"
+deps.fabric_api = "0.155.3+26.1.2"
+
+["26.2"]
+mod.mc_compat = "~26.2"
+deps.fabric_api = "0.158.0+26.2"
