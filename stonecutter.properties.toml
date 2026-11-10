@@ -2,7 +2,7 @@
 mod.id = "hypaflippa"
 mod.name = "Hypa Flippa"
 mod.group = "com.hypaflippa"
-mod.version = "1.0.1"
+mod.version = "1.1.0"
 
 # Modrinth project ID (Project settings > General), used by `./gradlew publishMods`.
 publish.modrinth_id = ""

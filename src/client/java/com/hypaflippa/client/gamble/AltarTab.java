@@ -1,16 +1,18 @@
-package com.hypaflippa.client.tabs;
+package com.hypaflippa.client.gamble;
 
-import com.hypaflippa.BazaarData;
-import com.hypaflippa.BazaarPrices;
 import com.hypaflippa.Format;
 import com.hypaflippa.HypaFlippaConfig;
-import com.hypaflippa.client.FlipperState;
+import com.hypaflippa.client.Features;
+import com.hypaflippa.client.MarketState;
+import com.hypaflippa.client.ui.Controls;
 import com.hypaflippa.client.ui.Stepper;
 import com.hypaflippa.client.ui.Tab;
 import com.hypaflippa.client.ui.Ui;
 import com.hypaflippa.gamble.AltarCalculator;
 import com.hypaflippa.gamble.GambleData;
 import com.hypaflippa.gamble.GambleResult;
+import com.hypaflippa.market.bazaar.BazaarData;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -21,20 +23,42 @@ import java.util.List;
  * breakdown. On a fragment's bazaar page it shows that fragment instead.
  */
 public class AltarTab implements Tab {
-    private static final int CONTROLS_HEIGHT = 22;
     private static final int HEADLINE_HEIGHT = 26;
 
+    private final Controls controls = new Controls(1, () -> config().save())
+            .button(0, 4, 92, () -> config().priceMode == BazaarPrices.Mode.ORDER ? "Prices: Order" : "Prices: Instant", () -> false,
+                    () -> new Ui.Help("Prices",
+                            "Order: buy fragments with buy orders and sell drops with sell offers (better prices, but you wait).\nInstant: insta-buy and insta-sell."),
+                    () -> config().priceMode = config().priceMode == BazaarPrices.Mode.ORDER ? BazaarPrices.Mode.INSTANT : BazaarPrices.Mode.ORDER)
+            .stepper(0, 100, new Stepper(76, () -> "Endermite " + config().endermiteLevel, (dir, shift) -> {
+                HypaFlippaConfig c = config();
+                c.endermiteLevel = Math.clamp(c.endermiteLevel + dir * (shift ? 10 : 1), 0, 100);
+            }), () -> new Ui.Help("Mythic Endermite level",
+                    "The level of your Mythic Endermite pet, which raises the altar's bonus chance. 0 if you don't have one."));
     private final BreakdownView breakdown = new BreakdownView();
-    private final Stepper endermite = new Stepper(76, () -> "Endermite " + config().endermiteLevel, (dir, shift) -> {
-        HypaFlippaConfig c = config();
-        c.endermiteLevel = Math.clamp(c.endermiteLevel + dir * (shift ? 10 : 1), 0, 100);
-    });
 
     /** Fragment item id picked by a bazaar page, or null to show the best one. */
     private String focused;
 
+    // The last results and what they were worked out from: they only change with these.
+    private List<GambleResult> results;
+    private BazaarData resultsData;
+    private BazaarPrices.Mode resultsMode;
+    private int resultsEndermite;
+
     private static HypaFlippaConfig config() {
-        return FlipperState.general;
+        return Features.general;
+    }
+
+    private List<GambleResult> results(BazaarData data) {
+        HypaFlippaConfig c = config();
+        if (results == null || data != resultsData || c.priceMode != resultsMode || c.endermiteLevel != resultsEndermite) {
+            results = AltarCalculator.evaluateAll(GambleData.altar(), data, c.priceMode, c.endermiteLevel);
+            resultsData = data;
+            resultsMode = c.priceMode;
+            resultsEndermite = c.endermiteLevel;
+        }
+        return results;
     }
 
     @Override public String id() { return "altar"; }
@@ -42,12 +66,8 @@ public class AltarTab implements Tab {
 
     // --- Layout
 
-    private static Ui.Rect priceModeButton(Ui.Rect area) { return new Ui.Rect(area.x() + 4, area.y() + 3, 92, 16); }
-    private static int stepperX(Ui.Rect area) { return area.x() + 100; }
-    private static int stepperY(Ui.Rect area) { return area.y() + 3; }
-
-    private static Ui.Rect breakdownArea(Ui.Rect area) {
-        int top = area.y() + CONTROLS_HEIGHT + HEADLINE_HEIGHT;
+    private Ui.Rect breakdownArea(Ui.Rect area) {
+        int top = area.y() + controls.height() + HEADLINE_HEIGHT;
         return new Ui.Rect(area.x(), top, area.w(), area.bottom() - top);
     }
 
@@ -55,13 +75,7 @@ public class AltarTab implements Tab {
 
     @Override
     public void mouseClicked(Ui.Rect area, double mx, double my, boolean shift) {
-        HypaFlippaConfig c = config();
-        if (priceModeButton(area).contains(mx, my)) {
-            c.priceMode = c.priceMode == BazaarPrices.Mode.ORDER ? BazaarPrices.Mode.INSTANT : BazaarPrices.Mode.ORDER;
-            c.save();
-        } else if (endermite.click(stepperX(area), stepperY(area), mx, my, shift)) {
-            c.save();
-        }
+        controls.click(area, mx, my, shift);
     }
 
     @Override
@@ -91,19 +105,18 @@ public class AltarTab implements Tab {
 
     @Override
     public void render(GuiGraphicsExtractor guis, Font font, Ui.Rect area, int mouseX, int mouseY) {
-        HypaFlippaConfig c = config();
-        guis.fill(area.x() - 2, area.y(), area.right() + 2, area.y() + CONTROLS_HEIGHT, Ui.CONTROLS_BG);
-        Ui.button(guis, font, priceModeButton(area), c.priceMode == BazaarPrices.Mode.ORDER ? "Prices: Order" : "Prices: Instant", mouseX, mouseY);
-        endermite.render(guis, font, stepperX(area), stepperY(area), mouseX, mouseY);
+        controls.render(guis, font, area, mouseX, mouseY);
+        Ui.Help help = controls.helpAt(area, mouseX, mouseY);
+        if (help != null) Ui.helpTooltip(guis, font, area, mouseX, mouseY, help);
 
-        BazaarData data = FlipperState.data();
+        BazaarData data = MarketState.data();
         if (data == null) {
-            String message = FlipperState.error() != null ? FlipperState.error() : "Loading...";
+            String message = MarketState.error() != null ? MarketState.error() : "Loading...";
             guis.centeredText(font, message, area.x() + area.w() / 2, area.y() + area.h() / 2, Ui.TEXT_FAINT);
             return;
         }
 
-        List<GambleResult> results = AltarCalculator.evaluateAll(GambleData.altar(), data, c.priceMode, c.endermiteLevel);
+        List<GambleResult> results = results(data);
         GambleResult shown = results.getFirst();
         boolean isBest = true;
         if (focused != null) {
@@ -116,7 +129,7 @@ public class AltarTab implements Tab {
         }
 
         // Headline: which fragment, and its profit per sacrifice.
-        int y = area.y() + CONTROLS_HEIGHT + 3;
+        int y = area.y() + controls.height() + 3;
         String name = (focused == null ? "Best: " : "") + shown.name();
         String profit = shown.hasCost() ? Format.signedCoins(shown.profit()) : "?";
         int profitColor = shown.hasCost() ? Ui.signColor(shown.profit()) : Ui.TEXT_FAINT;

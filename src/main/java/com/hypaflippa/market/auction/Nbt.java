@@ -1,4 +1,4 @@
-package com.hypaflippa.auction;
+package com.hypaflippa.market.auction;
 
 import java.io.BufferedInputStream;
 import java.io.ByteArrayInputStream;

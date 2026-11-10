@@ -1,4 +1,4 @@
-package com.hypaflippa.auction;
+package com.hypaflippa.market.auction;
 
 import java.util.Map;
 import java.util.OptionalDouble;
@@ -9,12 +9,20 @@ import java.util.OptionalDouble;
  * Items are identified by price keys (see {@link AuctionApiClient#priceKey}): the SkyBlock item
  * id, plus type and level for runes ({@code RUNE:JERRY:3}) and type and rarity for pets
  * ({@code PET:SNOWMAN:LEGENDARY}).
+ *
+ * @param binCounts how many BIN auctions each item has: with only one or two, the lowest BIN is
+ *                  just whatever someone asked, not a market price
  */
-public record AuctionPrices(Map<String, Double> lowestBin, int binAuctions, long fetchedAtMs) {
+public record AuctionPrices(Map<String, Double> lowestBin, Map<String, Integer> binCounts, int binAuctions, long fetchedAtMs) {
 
     public OptionalDouble lowestBin(String key) {
         Double price = lowestBin.get(key);
         return price == null ? OptionalDouble.empty() : OptionalDouble.of(price);
+    }
+
+    /** BIN auctions of this item in the last scan, 0 if none. */
+    public int binCount(String key) {
+        return binCounts.getOrDefault(key, 0);
     }
 
     /** What you'd actually receive selling one at the lowest BIN, after Hypixel's auction fees. */

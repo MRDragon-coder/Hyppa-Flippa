@@ -1,6 +1,8 @@
-package com.hypaflippa;
+package com.hypaflippa.market;
 
-import com.hypaflippa.auction.AuctionPrices;
+import com.hypaflippa.market.auction.AuctionPrices;
+import com.hypaflippa.market.bazaar.BazaarData;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 
 import java.util.Optional;
 import java.util.OptionalDouble;

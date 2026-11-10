@@ -4,10 +4,14 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hypaflippa.flips.bazaar.BazaarFlipperConfig;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 /** Settings shared by the whole Hypa Flippa window (config/hypaflippa/general.json). */
 public class HypaFlippaConfig {
@@ -17,6 +21,8 @@ public class HypaFlippaConfig {
     public int windowHeight = 400;
     /** Id of the tab that was open last. */
     public String activeTab = "bazaar";
+    /** Per section of the window (Flippa, Gamba): the id of the tab that was open last in it. */
+    public Map<String, String> lastTabs = new HashMap<>();
 
     /** How the gamble tabs price things (the flipper always uses order prices). */
     public BazaarPrices.Mode priceMode = BazaarPrices.Mode.ORDER;
@@ -56,6 +62,7 @@ public class HypaFlippaConfig {
         windowWidth = saved.windowWidth;
         windowHeight = saved.windowHeight;
         if (saved.activeTab != null) activeTab = saved.activeTab;
+        if (saved.lastTabs != null) lastTabs = new HashMap<>(saved.lastTabs);
         if (saved.priceMode != null) priceMode = saved.priceMode;
         endermiteLevel = saved.endermiteLevel;
         giftBothRolls = saved.giftBothRolls;

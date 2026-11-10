@@ -1,4 +1,4 @@
-package com.hypaflippa;
+package com.hypaflippa.market;
 
 import com.google.gson.Gson;
 

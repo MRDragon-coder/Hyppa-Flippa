@@ -1,9 +1,10 @@
-package com.hypaflippa;
+package com.hypaflippa.flips.bazaar;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hypaflippa.HypaFlippa;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.IOException;
@@ -17,23 +18,23 @@ import java.util.List;
  */
 public class BazaarFlipperConfig {
     /** Sort columns of the Orders page (also what /flips accepts). */
-    public static final List<String> ORDER_SORT_MODES = List.of("name", "buy", "sell", "margin");
+    public static final List<String> ORDER_SORT_MODES = List.of("name", "buy", "sell", "margin", "vol", "outbid", "coins");
     /** Sort columns of the NPC page. */
-    public static final List<String> NPC_SORT_MODES = List.of("name", "order", "insta", "npc", "orderMargin", "instaMargin");
+    public static final List<String> NPC_SORT_MODES = List.of("name", "order", "insta", "npc", "orderMargin", "instaMargin", "vol", "outbid", "coins");
 
     public static final String PAGE_ORDERS = "orders";
     public static final String PAGE_NPC = "npc";
 
     /** Which page of the Bazaar tab is open. */
     public String page = PAGE_ORDERS;
-    /** Buy order → sell offer flips. */
+    /** Buy order â†’ sell offer flips. */
     public FlipFilters orders = new FlipFilters("buy");
     /**
-     * Buy order / insta-buy → sell to an NPC. Starts sorted on insta margin: order margins are
+     * Buy order / insta-buy â†’ sell to an NPC. Starts sorted on insta margin: order margins are
      * often inflated by joke buy orders at ~0.1 coins.
      */
     public FlipFilters npc = new FlipFilters("instaMargin");
-    /** Order-book manipulation threshold for the Orders page (see BazaarApiClient.isManipulated). */
+    /** Order-book manipulation threshold for the Orders page (see BazaarFlip.isManipulated). */
     public double maxSpreadRatio = 2.0;
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
@@ -43,7 +44,7 @@ public class BazaarFlipperConfig {
     private static final Path LEGACY_PATH = FabricLoader.getInstance().getConfigDir().resolve("bazaaflipper.json");
 
     /** The saved bazaar settings file, falling back to the pre-rename one; null if neither exists. */
-    static Path existingFile() {
+    public static Path existingFile() {
         if (Files.exists(PATH)) return PATH;
         return Files.exists(LEGACY_PATH) ? LEGACY_PATH : null;
     }

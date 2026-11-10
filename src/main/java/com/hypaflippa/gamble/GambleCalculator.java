@@ -1,12 +1,12 @@
 package com.hypaflippa.gamble;
 
-import com.hypaflippa.BazaarData;
-import com.hypaflippa.BazaarPrices;
 import com.hypaflippa.Format;
-import com.hypaflippa.ItemPrices;
-import com.hypaflippa.auction.AuctionPrices;
 import com.hypaflippa.gamble.GambleResult.Kind;
 import com.hypaflippa.gamble.GambleResult.Line;
+import com.hypaflippa.market.ItemPrices;
+import com.hypaflippa.market.auction.AuctionPrices;
+import com.hypaflippa.market.bazaar.BazaarData;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 
 import java.util.ArrayList;
 import java.util.Comparator;

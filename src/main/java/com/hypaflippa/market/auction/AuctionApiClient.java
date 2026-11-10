@@ -1,8 +1,9 @@
-package com.hypaflippa.auction;
+package com.hypaflippa.market.auction;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.hypaflippa.HypaFlippa;
 
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -59,7 +60,8 @@ public final class AuctionApiClient {
         Page first = fetchPage(0);
 
         Map<String, Double> lowest = new HashMap<>();
-        int binAuctions = collect(first, lowest);
+        Map<String, Integer> counts = new HashMap<>();
+        int binAuctions = collect(first, lowest, counts);
 
         ExecutorService pool = Executors.newFixedThreadPool(PARALLEL_PAGES, runnable -> {
             Thread thread = new Thread(runnable, "HypaFlippa-Auctions");
@@ -75,13 +77,13 @@ public final class AuctionApiClient {
             int skipped = 0;
             for (Future<Page> page : pages) {
                 try {
-                    binAuctions += collect(page.get(), lowest);
+                    binAuctions += collect(page.get(), lowest, counts);
                 } catch (ExecutionException e) {
                     // This page failed every attempt; the other pages still give good prices.
                     skipped++;
                 }
             }
-            AuctionPrices prices = new AuctionPrices(Map.copyOf(lowest), binAuctions, System.currentTimeMillis());
+            AuctionPrices prices = new AuctionPrices(Map.copyOf(lowest), Map.copyOf(counts), binAuctions, System.currentTimeMillis());
             return new Scan(prices, first.totalPages, skipped, System.currentTimeMillis() - start);
         } finally {
             pool.shutdownNow();
@@ -111,8 +113,8 @@ public final class AuctionApiClient {
         throw new IllegalStateException("Auction page " + page + " failed " + ATTEMPTS_PER_PAGE + " times", last);
     }
 
-    /** Folds one page's BIN auctions into {@code lowest}; returns how many BIN auctions it had. */
-    private static int collect(Page page, Map<String, Double> lowest) {
+    /** Folds one page's BIN auctions into {@code lowest} and {@code counts}; returns how many BIN auctions it had. */
+    private static int collect(Page page, Map<String, Double> lowest, Map<String, Integer> counts) {
         int count = 0;
         for (Auction auction : page.auctions) {
             if (!auction.bin || auction.item_bytes == null) continue;
@@ -127,6 +129,7 @@ public final class AuctionApiClient {
                 // starting_bid is for the whole stack.
                 double perUnit = auction.starting_bid / Math.max(1, Nbt.getInt(item, "Count", 1));
                 lowest.merge(key, perUnit, Math::min);
+                counts.merge(key, 1, Integer::sum);
                 count++;
             } catch (Exception ignored) {
                 // One unreadable item shouldn't spoil the whole scan.

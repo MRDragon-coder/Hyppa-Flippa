@@ -1,4 +1,8 @@
-package com.hypaflippa;
+package com.hypaflippa.flips.bazaar;
+
+import com.hypaflippa.market.CoflnetApiClient;
+import com.hypaflippa.market.MarketStats;
+import com.hypaflippa.market.bazaar.BazaarData;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -24,6 +28,15 @@ public record NpcFlip(String productId, double buyOrderPrice, double instaBuyPri
         return (npcPrice - buyOrderPrice) / buyOrderPrice * 100;
     }
 
+    /**
+     * Coins per hour on the buying side: players insta-selling into buy orders (sellMovingWeek,
+     * at about the buy-order price), over Hypixel's 7-day volume window. NPCs buy any amount, so
+     * the selling side is never the bottleneck.
+     */
+    public double coinsPerHour() {
+        return sellMovingWeek * buyOrderPrice / 168;
+    }
+
     /** NaN without sell offers. */
     public double instaMarginPercent() {
         return (npcPrice - instaBuyPrice) / instaBuyPrice * 100;
@@ -35,10 +48,11 @@ public record NpcFlip(String productId, double buyOrderPrice, double instaBuyPri
      * above the cheapest sell offer); {@code minInstaProfitPercent}, when set, on the insta margin.
      *
      * @param npcPrices NPC sell price per item id (from Hypixel's item list)
-     * @param nameOf    the display name of a product id, used when sorting by name
+     * @param nameOf the display name of a product id, used when sorting by name
+     * @param stats  history-based stats (volatility, outbid time) for filtering and sorting
      */
     public static List<NpcFlip> find(BazaarData data, Map<String, Double> npcPrices, FlipFilters filters,
-                                     Function<String, String> nameOf) {
+                                     Function<String, String> nameOf, MarketStats stats) {
         List<NpcFlip> flips = new ArrayList<>();
         for (Map.Entry<String, BazaarData.Product> entry : data.getProducts().entrySet()) {
             Double npcPrice = npcPrices.get(entry.getKey());
@@ -62,6 +76,8 @@ public record NpcFlip(String productId, double buyOrderPrice, double instaBuyPri
             // With the insta filter on, items you can't insta-buy (no sell offers) are left out too.
             if (filters.minInstaProfitPercent != null
                     && (!flip.hasInstaBuy() || flip.instaMarginPercent() < filters.minInstaProfitPercent)) continue;
+            if (filters.minCoinsPerHour != null && flip.coinsPerHour() < filters.minCoinsPerHour) continue;
+            if (filters.hiddenByStats(stats.volatilityPercent(entry.getKey()), outbidMinutes(stats, entry.getKey()))) continue;
             flips.add(flip);
         }
 
@@ -73,13 +89,25 @@ public record NpcFlip(String productId, double buyOrderPrice, double instaBuyPri
             case "insta" -> Comparator.comparingDouble(NpcFlip::instaBuyPrice);
             case "npc" -> Comparator.comparingDouble(NpcFlip::npcPrice);
             case "instaMargin" -> Comparator.comparingDouble(NpcFlip::instaMarginPercent);
+            case "coins" -> Comparator.comparingDouble(NpcFlip::coinsPerHour);
             default -> Comparator.comparingDouble(NpcFlip::orderMarginPercent);
         };
         if (!filters.sortAscending) order = order.reversed();
         if (filters.sortBy.startsWith("insta")) {
             order = Comparator.comparing((NpcFlip flip) -> !flip.hasInstaBuy()).thenComparing(order);
         }
+        if (filters.sortBy.equals("vol")) order = filters.statOrder((NpcFlip flip) -> stats.volatilityPercent(flip.productId()));
+        if (filters.sortBy.equals("outbid")) order = filters.statOrder((NpcFlip flip) -> outbidMinutes(stats, flip.productId()));
         flips.sort(order);
         return flips.size() > filters.maxResults ? new ArrayList<>(flips.subList(0, filters.maxResults)) : flips;
+    }
+
+    /**
+     * Minutes until an NPC flip needs attention: only a buy order can get outbid (NPCs don't
+     * compete, and insta-buying has no order to beat). Null while unknown.
+     */
+    public static Double outbidMinutes(MarketStats stats, String productId) {
+        CoflnetApiClient.Outbid outbid = stats.outbid(productId);
+        return outbid == null ? null : outbid.buyOrderMinutes();
     }
 }

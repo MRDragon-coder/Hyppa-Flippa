@@ -1,16 +1,19 @@
-package com.hypaflippa.client.tabs;
+package com.hypaflippa.client.gamble;
 
-import com.hypaflippa.BazaarData;
-import com.hypaflippa.BazaarPrices;
 import com.hypaflippa.Format;
 import com.hypaflippa.HypaFlippaConfig;
-import com.hypaflippa.client.FlipperState;
+import com.hypaflippa.client.Features;
+import com.hypaflippa.client.MarketState;
+import com.hypaflippa.client.ui.Controls;
 import com.hypaflippa.client.ui.Tab;
 import com.hypaflippa.client.ui.TableLayout;
 import com.hypaflippa.client.ui.Ui;
 import com.hypaflippa.gamble.GambleCalculator;
 import com.hypaflippa.gamble.GambleData;
 import com.hypaflippa.gamble.GambleResult;
+import com.hypaflippa.market.auction.AuctionPrices;
+import com.hypaflippa.market.bazaar.BazaarData;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -23,12 +26,18 @@ import java.util.function.Supplier;
  * every option on top, and the breakdown of the selected one below.
  */
 public class GambleTab implements Tab {
-    private static final int CONTROLS_HEIGHT = 22;
     private static final int HEADER_HEIGHT = 14;
     private static final int ROW_HEIGHT = 14;
     private static final int TITLE_HEIGHT = 14;
     private static final int FOOTNOTE_HEIGHT = 12;
     private static final String[] HEADERS = {"Cost", "Return", "Profit", "ROI"};
+    /** Hover help of each header, in the same order. */
+    private static final Ui.Help[] HEADER_HELP = {
+            new Ui.Help("Cost", "What one costs to buy on the bazaar."),
+            new Ui.Help("Return", "What the drops are worth on average per opening, after tax and fees."),
+            new Ui.Help("Profit", "Return minus Cost: what you win or lose per opening on average."),
+            new Ui.Help("ROI", "Profit as a percentage of Cost."),
+    };
 
     private final String id;
     private final String title;
@@ -36,18 +45,35 @@ public class GambleTab implements Tab {
     /** Gifts give the other player a roll too; only then is the "Rolls" toggle shown. */
     private final boolean twoPlayer;
 
+    private final Controls controls;
     private final BreakdownView breakdown = new BreakdownView();
     private int selected;
+
+    // The last results and what they were worked out from: they only change with these.
+    private List<GambleResult> results;
+    private BazaarData resultsData;
+    private AuctionPrices resultsAuctions;
+    private BazaarPrices.Mode resultsMode;
+    private int resultsRolls;
 
     public GambleTab(String id, String title, Supplier<List<GambleData.Table>> tables, boolean twoPlayer) {
         this.id = id;
         this.title = title;
         this.tables = tables;
         this.twoPlayer = twoPlayer;
+        this.controls = new Controls(1, () -> config().save())
+                .button(0, 4, 92, () -> config().priceMode == BazaarPrices.Mode.ORDER ? "Prices: Order" : "Prices: Instant", () -> false,
+                        () -> new Ui.Help("Prices",
+                                "Order: buy with buy orders and sell with sell offers (better prices, but you wait).\nInstant: insta-buy and insta-sell."),
+                        () -> config().priceMode = config().priceMode == BazaarPrices.Mode.ORDER ? BazaarPrices.Mode.INSTANT : BazaarPrices.Mode.ORDER)
+                .button(0, 100, 92, () -> config().giftBothRolls ? "Rolls: Both" : "Rolls: Yours", () -> false,
+                        () -> new Ui.Help("Rolls",
+                                "Yours: count only your own reward.\nBoth: also count the reward the other player gets (each of you rolls once)."),
+                        () -> config().giftBothRolls = !config().giftBothRolls, () -> twoPlayer);
     }
 
     private static HypaFlippaConfig config() {
-        return FlipperState.general;
+        return Features.general;
     }
 
     @Override public String id() { return id; }
@@ -58,21 +84,28 @@ public class GambleTab implements Tab {
     }
 
     private List<GambleResult> results(BazaarData data) {
-        List<GambleResult> results = new ArrayList<>();
-        for (GambleData.Table table : tables.get()) {
-            results.add(GambleCalculator.evaluate(table, data, FlipperState.auctions(), config().priceMode, rolls()));
+        AuctionPrices auctions = MarketState.auctions();
+        BazaarPrices.Mode mode = config().priceMode;
+        if (results == null || data != resultsData || auctions != resultsAuctions || mode != resultsMode || rolls() != resultsRolls) {
+            List<GambleResult> fresh = new ArrayList<>();
+            for (GambleData.Table table : tables.get()) {
+                fresh.add(GambleCalculator.evaluate(table, data, auctions, mode, rolls()));
+            }
+            results = fresh;
+            resultsData = data;
+            resultsAuctions = auctions;
+            resultsMode = mode;
+            resultsRolls = rolls();
         }
         return results;
     }
 
     // --- Layout
 
-    private static Ui.Rect priceModeButton(Ui.Rect area) { return new Ui.Rect(area.x() + 4, area.y() + 3, 92, 16); }
-    private static Ui.Rect rollsButton(Ui.Rect area) { return new Ui.Rect(area.x() + 100, area.y() + 3, 92, 16); }
-    private static Ui.Rect header(Ui.Rect area) { return new Ui.Rect(area.x(), area.y() + CONTROLS_HEIGHT, area.w(), HEADER_HEIGHT); }
+    private Ui.Rect header(Ui.Rect area) { return new Ui.Rect(area.x(), area.y() + controls.height(), area.w(), HEADER_HEIGHT); }
 
     private Ui.Rect row(Ui.Rect area, int index) {
-        return new Ui.Rect(area.x(), area.y() + CONTROLS_HEIGHT + HEADER_HEIGHT + index * ROW_HEIGHT, area.w(), ROW_HEIGHT);
+        return new Ui.Rect(area.x(), area.y() + controls.height() + HEADER_HEIGHT + index * ROW_HEIGHT, area.w(), ROW_HEIGHT);
     }
 
     private Ui.Rect breakdownTitle(Ui.Rect area) {
@@ -90,17 +123,9 @@ public class GambleTab implements Tab {
 
     @Override
     public void mouseClicked(Ui.Rect area, double mx, double my, boolean shift) {
-        HypaFlippaConfig c = config();
-        if (priceModeButton(area).contains(mx, my)) {
-            c.priceMode = c.priceMode == BazaarPrices.Mode.ORDER ? BazaarPrices.Mode.INSTANT : BazaarPrices.Mode.ORDER;
-            c.save();
-        } else if (twoPlayer && rollsButton(area).contains(mx, my)) {
-            c.giftBothRolls = !c.giftBothRolls;
-            c.save();
-        } else {
-            for (int i = 0; i < tables.get().size(); i++) {
-                if (row(area, i).contains(mx, my)) select(i);
-            }
+        if (controls.click(area, mx, my, shift)) return;
+        for (int i = 0; i < tables.get().size(); i++) {
+            if (row(area, i).contains(mx, my)) select(i);
         }
     }
 
@@ -130,16 +155,13 @@ public class GambleTab implements Tab {
 
     @Override
     public void render(GuiGraphicsExtractor guis, Font font, Ui.Rect area, int mouseX, int mouseY) {
-        HypaFlippaConfig c = config();
-        guis.fill(area.x() - 2, area.y(), area.right() + 2, area.y() + CONTROLS_HEIGHT, Ui.CONTROLS_BG);
-        Ui.button(guis, font, priceModeButton(area), c.priceMode == BazaarPrices.Mode.ORDER ? "Prices: Order" : "Prices: Instant", mouseX, mouseY);
-        if (twoPlayer) {
-            Ui.button(guis, font, rollsButton(area), c.giftBothRolls ? "Rolls: Both" : "Rolls: Yours", mouseX, mouseY);
-        }
+        controls.render(guis, font, area, mouseX, mouseY);
+        Ui.Help controlHelp = controls.helpAt(area, mouseX, mouseY);
+        if (controlHelp != null) Ui.helpTooltip(guis, font, area, mouseX, mouseY, controlHelp);
 
-        BazaarData data = FlipperState.data();
+        BazaarData data = MarketState.data();
         if (data == null) {
-            String message = FlipperState.error() != null ? FlipperState.error() : "Loading...";
+            String message = MarketState.error() != null ? MarketState.error() : "Loading...";
             guis.centeredText(font, message, area.x() + area.w() / 2, area.y() + area.h() / 2, Ui.TEXT_FAINT);
             return;
         }
@@ -182,17 +204,21 @@ public class GambleTab implements Tab {
         breakdown.render(guis, font, breakdownArea(area), chosen);
 
         guis.text(font, Ui.fit(font, footnote(results), area.w() - 8), area.x() + 4, area.bottom() - 10, Ui.TEXT_FAINT);
+
+        if (header.contains(mouseX, mouseY) && cols.columnAt(mouseX) >= 0) {
+            Ui.helpTooltip(guis, font, area, mouseX, mouseY, HEADER_HELP[cols.columnAt(mouseX)]);
+        }
     }
 
     /** Auction House status, plus a warning when some drops couldn't be priced. */
     private static String footnote(List<GambleResult> results) {
         String auctionStatus;
-        if (FlipperState.auctions() == null) {
-            auctionStatus = FlipperState.auctionFetchFailed() ? "AH prices: fetch failed" : "AH prices: loading...";
+        if (MarketState.auctions() == null) {
+            auctionStatus = MarketState.auctionFetchFailed() ? "AH prices: fetch failed" : "AH prices: loading...";
         } else {
-            long minutes = (System.currentTimeMillis() - FlipperState.auctions().fetchedAtMs()) / 60_000;
+            long minutes = (System.currentTimeMillis() - MarketState.auctions().fetchedAtMs()) / 60_000;
             auctionStatus = "AH prices: " + (minutes == 0 ? "just now" : minutes + "m ago")
-                    + (FlipperState.isFetchingAuctions() ? " (updating)" : "");
+                    + (MarketState.isFetchingAuctions() ? " (updating)" : "");
         }
         boolean incomplete = results.stream().anyMatch(GambleResult::isIncomplete);
         return incomplete ? "* no price for some drops | " + auctionStatus : auctionStatus;

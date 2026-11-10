@@ -1,9 +1,9 @@
-package com.hypaflippa.client.tabs;
+package com.hypaflippa.client.gamble;
 
 import com.hypaflippa.Format;
-import com.hypaflippa.gamble.GambleResult;
 import com.hypaflippa.client.ui.TableLayout;
 import com.hypaflippa.client.ui.Ui;
+import com.hypaflippa.gamble.GambleResult;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 

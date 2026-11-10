@@ -85,7 +85,7 @@ public final class WindowOverlay {
             if (visible()) window().render(guis, mouseX, mouseY);
         });
         ScreenEvents.afterTick(screen).register(s -> {
-            if (visible()) FlipperState.refreshIfStale();
+            if (visible()) MarketState.refreshIfStale();
         });
 
         // The creative inventory has a search box; typing there must not toggle the window.

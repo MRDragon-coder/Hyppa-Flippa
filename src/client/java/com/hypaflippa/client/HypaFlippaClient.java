@@ -1,12 +1,14 @@
 package com.hypaflippa.client;
 
-import com.hypaflippa.BazaarFlipperConfig;
-import com.hypaflippa.FlipFilters;
 import com.hypaflippa.HypaFlippa;
-import com.hypaflippa.client.tabs.AltarTab;
-import com.hypaflippa.client.tabs.BazaarTab;
-import com.hypaflippa.client.tabs.GambleTab;
+import com.hypaflippa.client.flips.BazaarTab;
+import com.hypaflippa.client.flips.CraftTab;
+import com.hypaflippa.client.gamble.AltarTab;
+import com.hypaflippa.client.gamble.GambleTab;
 import com.hypaflippa.client.ui.HypaWindow;
+import com.hypaflippa.client.ui.Section;
+import com.hypaflippa.flips.bazaar.BazaarFlipperConfig;
+import com.hypaflippa.flips.bazaar.FlipFilters;
 import com.hypaflippa.gamble.GambleData;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.brigadier.Command;
@@ -45,12 +47,15 @@ public class HypaFlippaClient implements ClientModInitializer {
 
     @Override
     public void onInitializeClient() {
-        FlipperState.init();
+        Features.load();
         window = new HypaWindow(List.of(
-                new BazaarTab(),
-                new GambleTab("jerry", "Jerry", GambleData::jerryBoxes, false),
-                new GambleTab("gifts", "Gifts", GambleData::gifts, true),
-                new AltarTab()
+                new Section("flippa", "Flippa", List.of(
+                        new BazaarTab(),
+                        new CraftTab())),
+                new Section("gamba", "Gamba", List.of(
+                        new GambleTab("jerry", "Jerry", GambleData::jerryBoxes, false),
+                        new GambleTab("gifts", "Gifts", GambleData::gifts, true),
+                        new AltarTab()))
         ));
 
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(HypaFlippa.MOD_ID, "main"));
@@ -59,6 +64,7 @@ public class HypaFlippaClient implements ClientModInitializer {
         // Outside menus the key is handled here; inside menus WindowOverlay and HypaFlippaScreen
         // handle it, because open screens receive key presses instead of key mappings.
         ClientTickEvents.END_CLIENT_TICK.register(client -> {
+            Features.tick();
             while (toggleKey.consumeClick()) {
                 if (McCompat.currentScreen(client) == null) McCompat.setScreen(client, new HypaFlippaScreen());
             }
@@ -95,8 +101,9 @@ public class HypaFlippaClient implements ClientModInitializer {
         // The config was loaded from disk at startup. Arguments typed now override it and are
         // saved; arguments left out keep their saved values instead of resetting to defaults.
         // /flips is about order flips, so it always opens (and sets) the Orders page.
-        FlipperState.config.page = BazaarFlipperConfig.PAGE_ORDERS;
-        FlipFilters config = FlipperState.config.orders;
+        BazaarFlipperConfig bazaar = Features.bazaar.config;
+        bazaar.page = BazaarFlipperConfig.PAGE_ORDERS;
+        FlipFilters config = bazaar.orders;
 
         String sortBy = optionalArgument(context, "sortBy", String.class);
         if (sortBy != null) {
@@ -116,10 +123,10 @@ public class HypaFlippaClient implements ClientModInitializer {
         if (minSellVol != null) config.minSellMovingWeek = minSellVol;
         Integer minBuyVol = optionalArgument(context, "minBuyVol", Integer.class);
         if (minBuyVol != null) config.minBuyMovingWeek = minBuyVol;
-        FlipperState.config.save();
+        bazaar.save();
 
-        FlipperState.recompute(); // instant if we already have data
-        FlipperState.refresh();
+        Features.changed(Features.bazaar); // instant if we already have data
+        MarketState.refresh();
 
         window.showTab("bazaar");
         openWindow(context.getSource().getClient());

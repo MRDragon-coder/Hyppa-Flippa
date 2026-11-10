@@ -1,5 +1,6 @@
 package com.hypaflippa.client.ui;
 
+import com.hypaflippa.client.Feature;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
@@ -14,10 +15,18 @@ public interface Tab {
     /** Short name shown on the tab button. */
     String title();
 
+    /** The feature whose results this tab shows, or null when it computes its own. */
+    default Feature feature() {
+        return null;
+    }
+
     void render(GuiGraphicsExtractor guis, Font font, Ui.Rect area, int mouseX, int mouseY);
 
     /** A left click inside the content area. */
     void mouseClicked(Ui.Rect area, double mx, double my, boolean shift);
+
+    /** A right click inside the content area. */
+    default void mouseRightClicked(Ui.Rect area, double mx, double my) {}
 
     void mouseScrolled(Ui.Rect area, double mx, double my, double deltaY);
 

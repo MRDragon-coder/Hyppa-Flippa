@@ -1,40 +1,57 @@
-package com.hypaflippa;
+package com.hypaflippa.flips.bazaar;
 
-import com.hypaflippa.BazaarData;
-import com.hypaflippa.BazaarFlip;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import com.hypaflippa.market.CoflnetApiClient;
+import com.hypaflippa.market.MarketStats;
+import com.hypaflippa.market.bazaar.BazaarData;
+import com.hypaflippa.market.bazaar.BazaarPrices;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 
-public class BazaarApiClient {
+/** One order flip: buy with a buy order at buyPrice, sell with a sell offer at sellPrice. */
+public class BazaarFlip {
+    private final String productId;
+    private final double buyPrice;
+    private final double sellPrice;
+    private final int maxQuantity;
+    private final double profitPerUnit;
+    private final double profitPercent;
+    private final int sellMovingWeek;
+    private final int buyMovingWeek;
 
-    private static final String BAZAAR_URL = "https://api.hypixel.net/v2/skyblock/bazaar";
-    private static final Gson GSON = new GsonBuilder().create();
-    // Shared and time-limited: a hung request would otherwise block every later refresh.
-    private static final HttpClient HTTP = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    public BazaarFlip(String productId, double buyPrice, double sellPrice, int maxQuantity, int sellMovingWeek, int buyMovingWeek) {
+        this.productId = productId;
+        this.buyPrice = buyPrice;
+        this.sellPrice = sellPrice;
+        this.maxQuantity = maxQuantity;
+        this.profitPerUnit = BazaarPrices.afterTax(sellPrice) - buyPrice;
+        this.profitPercent = buyPrice > 0 ? (profitPerUnit / buyPrice) * 100 : 0;
+        this.sellMovingWeek = sellMovingWeek;
+        this.buyMovingWeek = buyMovingWeek;
+    }
 
-    public static BazaarData fetchBazaarData() throws Exception {
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(BAZAAR_URL))
-                .timeout(Duration.ofSeconds(20))
-                .GET()
-                .build();
+    public String getProductId() { return productId; }
+    public double getBuyPrice() { return buyPrice; }
+    public double getSellPrice() { return sellPrice; }
+    public int getMaxQuantity() { return maxQuantity; }
+    public double getProfitPerUnit() { return profitPerUnit; }
+    public double getProfitPercent() { return profitPercent; }
+    public int getSellMovingWeek() { return sellMovingWeek; }
+    public int getBuyMovingWeek() { return buyMovingWeek; }
 
-        HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
-
-        return GSON.fromJson(response.body(), BazaarData.class);
+    /**
+     * Coins per hour flowing through the slower side of this flip. Your buy order fills from
+     * players insta-selling (sellMovingWeek, at about the buy price) and your sell offer from
+     * players insta-buying (buyMovingWeek, at about the sell price); a flip goes no faster than
+     * the slower of the two. Hypixel's volumes cover the last 7 days (168 hours).
+     */
+    public double coinsPerHour() {
+        double buySide = sellMovingWeek * buyPrice;
+        double sellSide = buyMovingWeek * sellPrice;
+        return Math.min(buySide, sellSide) / 168;
     }
 
     /**
@@ -61,8 +78,12 @@ public class BazaarApiClient {
                 || sellOfferConcentration > 0.5;
     }
 
-    /** @param nameOf the display name of a product id, used when sorting by name */
-    public static List<BazaarFlip> findFlips(BazaarData data, FlipFilters filters, double maxSpreadRatio, Function<String, String> nameOf) {
+    /**
+     * @param nameOf the display name of a product id, used when sorting by name
+     * @param stats  history-based stats (volatility, outbid time) for filtering and sorting
+     */
+    public static List<BazaarFlip> find(BazaarData data, FlipFilters filters, double maxSpreadRatio,
+                                      Function<String, String> nameOf, MarketStats stats) {
         List<BazaarFlip> flips = new ArrayList<>();
 
         for (Map.Entry<String, BazaarData.Product> entry : data.getProducts().entrySet()) {
@@ -99,7 +120,9 @@ public class BazaarApiClient {
             }
 
             BazaarFlip flip = new BazaarFlip(productId, buyPrice, sellPrice, maxQuantity, quickStatus.getSellMovingWeek(), quickStatus.getBuyMovingWeek());
-            if (flip.getProfitPercent() >= filters.minProfitPercent) {
+            if (flip.getProfitPercent() >= filters.minProfitPercent
+                    && (filters.minCoinsPerHour == null || flip.coinsPerHour() >= filters.minCoinsPerHour)
+                    && !filters.hiddenByStats(stats.volatilityPercent(productId), outbidMinutes(stats, productId))) {
                 flips.add(flip);
             }
         }
@@ -110,9 +133,25 @@ public class BazaarApiClient {
             case "name" -> Comparator.comparing((BazaarFlip flip) -> nameOf.apply(flip.getProductId()), String.CASE_INSENSITIVE_ORDER);
             case "sell" -> Comparator.comparingDouble(BazaarFlip::getSellPrice);
             case "margin" -> Comparator.comparingDouble(BazaarFlip::getProfitPercent);
+            case "coins" -> Comparator.comparingDouble(BazaarFlip::coinsPerHour);
             default -> Comparator.comparingDouble(BazaarFlip::getBuyPrice);
         };
-        flips.sort(filters.sortAscending ? order : order.reversed());
+        if (filters.sortBy.equals("vol")) {
+            flips.sort(filters.statOrder((BazaarFlip flip) -> stats.volatilityPercent(flip.getProductId())));
+        } else if (filters.sortBy.equals("outbid")) {
+            flips.sort(filters.statOrder((BazaarFlip flip) -> outbidMinutes(stats, flip.getProductId())));
+        } else {
+            flips.sort(filters.sortAscending ? order : order.reversed());
+        }
         return flips.size() > filters.maxResults ? new ArrayList<>(flips.subList(0, filters.maxResults)) : flips;
+    }
+
+    /**
+     * Minutes until an order flip needs attention: it has a buy order and a sell offer, and
+     * whichever gets beaten first is when you have to act. Null while unknown.
+     */
+    public static Double outbidMinutes(MarketStats stats, String productId) {
+        CoflnetApiClient.Outbid outbid = stats.outbid(productId);
+        return outbid == null ? null : outbid.fastest();
     }
 }

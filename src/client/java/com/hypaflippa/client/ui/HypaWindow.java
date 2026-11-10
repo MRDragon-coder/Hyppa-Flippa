@@ -1,16 +1,18 @@
 package com.hypaflippa.client.ui;
 
 import com.hypaflippa.HypaFlippaConfig;
-import com.hypaflippa.client.FlipperState;
+import com.hypaflippa.client.Features;
+import com.hypaflippa.client.MarketState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The Hypa Flippa window: title bar, tab bar, dragging, resizing and the border. Tabs draw the
- * content. There is one window shared by every host (bazaar overlay, other chest menus, the
+ * The Hypa Flippa window: title bar, section bar (Flippa, Gamba), the tab bar of the open
+ * section, dragging, resizing and the border. Tabs draw the content. There is one window shared by every host (bazaar overlay, other chest menus, the
  * standalone screen), so the open tab, scroll positions and selections carry over between them.
  *
  * Hosts forward mouse events; every handler returns true when the window used the event, so the
@@ -18,15 +20,21 @@ import java.util.List;
  */
 public class HypaWindow {
     private static final int TITLE_BAR_HEIGHT = 20;
+    private static final int SECTION_BAR_HEIGHT = 16;
     private static final int TAB_BAR_HEIGHT = 16;
     private static final int RESIZE_HANDLE_SIZE = 10;
     private static final int CLOSE_SIZE = 12;
     private static final int MIN_WIDTH = 260;
-    private static final int MIN_HEIGHT = 140;
+    // Enough for the Bazaar tab's three control rows plus its column picker.
+    private static final int MIN_HEIGHT = 216;
 
     private enum Drag { NONE, MOVE, RESIZE }
 
-    private final List<Tab> tabs;
+    private final List<Section> sections;
+    /** Every tab of every section, in order; activeTab indexes this list. */
+    private final List<Tab> tabs = new ArrayList<>();
+    /** The section index of each tab in {@link #tabs}. */
+    private final List<Integer> sectionOf = new ArrayList<>();
     private int activeTab;
 
     // Set when a bazaar page switched tabs for us, so leaving the page can switch back.
@@ -40,29 +48,58 @@ public class HypaWindow {
     private boolean pressConsumed;
     private int screenWidth, screenHeight;
 
-    public HypaWindow(List<Tab> tabs) {
-        this.tabs = tabs;
-        String saved = config().activeTab;
-        for (int i = 0; i < tabs.size(); i++) {
-            if (tabs.get(i).id().equals(saved)) activeTab = i;
+    public HypaWindow(List<Section> sections) {
+        this.sections = sections;
+        for (int s = 0; s < sections.size(); s++) {
+            for (Tab tab : sections.get(s).tabs()) {
+                tabs.add(tab);
+                sectionOf.add(s);
+            }
         }
+        int saved = indexOf(config().activeTab);
+        setActive(Math.max(0, saved));
     }
 
     private static HypaFlippaConfig config() {
-        return FlipperState.general;
+        return Features.general;
+    }
+
+    private int indexOf(String tabId) {
+        for (int i = 0; i < tabs.size(); i++) {
+            if (tabs.get(i).id().equals(tabId)) return i;
+        }
+        return -1;
+    }
+
+    private Section activeSection() {
+        return sections.get(sectionOf.get(activeTab));
     }
 
     public void showTab(String id) {
-        for (int i = 0; i < tabs.size(); i++) {
-            if (tabs.get(i).id().equals(id)) selectTab(i);
-        }
+        int index = indexOf(id);
+        if (index >= 0) selectTab(index);
     }
 
+    /** The player picked a tab: remember it, also as the one to reopen in its section. */
     private void selectTab(int index) {
-        activeTab = index;
         tabBeforeAutoFocus = -1; // the player picked a tab themselves
+        setActive(index);
         config().activeTab = tabs.get(index).id();
+        config().lastTabs.put(activeSection().id(), tabs.get(index).id());
         config().save();
+    }
+
+    /** The player picked a section: open the tab they last had open there (else its first). */
+    private void selectSection(int section) {
+        if (section == sectionOf.get(activeTab)) return;
+        int index = indexOf(config().lastTabs.getOrDefault(sections.get(section).id(), ""));
+        if (index < 0 || sectionOf.get(index) != section) index = sectionOf.indexOf(section);
+        selectTab(index);
+    }
+
+    private void setActive(int index) {
+        activeTab = index;
+        Features.show(tabs.get(index).feature()); // price history is fetched for what the open tab shows
     }
 
     /**
@@ -73,14 +110,15 @@ public class HypaWindow {
         for (int i = 0; i < tabs.size(); i++) {
             if (tabs.get(i).focusBazaarPage(title)) {
                 if (tabBeforeAutoFocus < 0) tabBeforeAutoFocus = activeTab;
-                activeTab = i;
+                if (i != activeTab) setActive(i);
                 return;
             }
         }
         if (tabBeforeAutoFocus >= 0) {
             tabs.forEach(Tab::clearFocus);
-            activeTab = tabBeforeAutoFocus;
+            int previous = tabBeforeAutoFocus;
             tabBeforeAutoFocus = -1;
+            if (previous != activeTab) setActive(previous);
         }
     }
 
@@ -96,15 +134,25 @@ public class HypaWindow {
     private Ui.Rect refreshButton() { Ui.Rect close = closeButton(); return new Ui.Rect(close.x() - CLOSE_SIZE - 3, close.y(), CLOSE_SIZE, CLOSE_SIZE); }
     private Ui.Rect resizeHandle() { HypaFlippaConfig c = config(); return new Ui.Rect(c.windowX + c.windowWidth - RESIZE_HANDLE_SIZE, c.windowY + c.windowHeight - RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE); }
 
+    private Ui.Rect sectionButton(int index) {
+        return barButton(index, sections.size(), config().windowY + TITLE_BAR_HEIGHT);
+    }
+
+    /** @param index the tab's place within the open section */
     private Ui.Rect tabButton(int index) {
+        return barButton(index, activeSection().tabs().size(), config().windowY + TITLE_BAR_HEIGHT + SECTION_BAR_HEIGHT);
+    }
+
+    /** One of {@code count} buttons sharing a bar's width. */
+    private Ui.Rect barButton(int index, int count, int barY) {
         HypaFlippaConfig c = config();
-        int width = (c.windowWidth - 4) / tabs.size();
-        return new Ui.Rect(c.windowX + 2 + index * width, c.windowY + TITLE_BAR_HEIGHT + 1, width - 1, TAB_BAR_HEIGHT - 2);
+        int width = (c.windowWidth - 4) / count;
+        return new Ui.Rect(c.windowX + 2 + index * width, barY + 1, width - 1, TAB_BAR_HEIGHT - 2);
     }
 
     private Ui.Rect contentArea() {
         HypaFlippaConfig c = config();
-        int top = c.windowY + TITLE_BAR_HEIGHT + TAB_BAR_HEIGHT;
+        int top = c.windowY + TITLE_BAR_HEIGHT + SECTION_BAR_HEIGHT + TAB_BAR_HEIGHT;
         return new Ui.Rect(c.windowX + 2, top, c.windowWidth - 4, c.windowY + c.windowHeight - 2 - top);
     }
 
@@ -130,12 +178,16 @@ public class HypaWindow {
         pressConsumed = isMouseOver(mx, my);
         if (!pressConsumed) return false;
         // Any click on the window is swallowed so it never reaches a chest slot behind it.
+        if (button == 1 && contentArea().contains(mx, my)) {
+            tabs.get(activeTab).mouseRightClicked(contentArea(), mx, my);
+            return true;
+        }
         if (button != 0) return true;
 
         if (closeButton().contains(mx, my)) {
             onClose.run();
         } else if (refreshButton().contains(mx, my)) {
-            FlipperState.refreshAll();
+            MarketState.refreshAll();
         } else if (resizeHandle().contains(mx, my)) {
             startDrag(Drag.RESIZE, mx, my);
         } else if (titleBar().contains(mx, my)) {
@@ -143,8 +195,12 @@ public class HypaWindow {
         } else if (contentArea().contains(mx, my)) {
             tabs.get(activeTab).mouseClicked(contentArea(), mx, my, shift);
         } else {
-            for (int i = 0; i < tabs.size(); i++) {
-                if (tabButton(i).contains(mx, my)) selectTab(i);
+            for (int i = 0; i < sections.size(); i++) {
+                if (sectionButton(i).contains(mx, my)) selectSection(i);
+            }
+            List<Tab> sectionTabs = activeSection().tabs();
+            for (int i = 0; i < sectionTabs.size(); i++) {
+                if (tabButton(i).contains(mx, my)) selectTab(tabs.indexOf(sectionTabs.get(i)));
             }
         }
         return true;
@@ -235,10 +291,17 @@ public class HypaWindow {
         Ui.button(guis, font, refresh, "↻", mouseX, mouseY); // ↻
         Ui.button(guis, font, closeButton(), "X", mouseX, mouseY);
 
-        // Tab bar
-        guis.fill(x, y + TITLE_BAR_HEIGHT, x + w, y + TITLE_BAR_HEIGHT + TAB_BAR_HEIGHT, Ui.CONTROLS_BG);
-        for (int i = 0; i < tabs.size(); i++) {
-            Ui.button(guis, font, tabButton(i), tabs.get(i).title(), mouseX, mouseY, i == activeTab);
+        // Section bar, then the tab bar of the open section
+        int sectionBarY = y + TITLE_BAR_HEIGHT;
+        guis.fill(x, sectionBarY, x + w, sectionBarY + SECTION_BAR_HEIGHT + TAB_BAR_HEIGHT, Ui.CONTROLS_BG);
+        int activeSection = sectionOf.get(activeTab);
+        for (int i = 0; i < sections.size(); i++) {
+            Ui.button(guis, font, sectionButton(i), sections.get(i).title(), mouseX, mouseY, i == activeSection);
+        }
+        List<Tab> sectionTabs = activeSection().tabs();
+        for (int i = 0; i < sectionTabs.size(); i++) {
+            Tab tab = sectionTabs.get(i);
+            Ui.button(guis, font, tabButton(i), tab.title(), mouseX, mouseY, tab == tabs.get(activeTab));
         }
 
         Ui.Rect content = contentArea();
@@ -250,10 +313,10 @@ public class HypaWindow {
     }
 
     private static String statusText() {
-        if (FlipperState.isFetching()) return "Updating...";
-        if (FlipperState.error() != null) return "Fetch failed";
-        if (FlipperState.data() == null) return "";
-        long seconds = (System.currentTimeMillis() - FlipperState.lastFetchMs()) / 1000;
+        if (MarketState.isFetching()) return "Updating...";
+        if (MarketState.error() != null) return "Fetch failed";
+        if (MarketState.data() == null) return "";
+        long seconds = (System.currentTimeMillis() - MarketState.lastFetchMs()) / 1000;
         return seconds + "s ago";
     }
 }

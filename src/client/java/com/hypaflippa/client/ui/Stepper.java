@@ -29,6 +29,11 @@ public final class Stepper {
         return 2 * BUTTON + labelWidth;
     }
 
+    /** The whole control: both buttons and the label between them. */
+    public Ui.Rect bounds(int x, int y) {
+        return new Ui.Rect(x, y, width(), HEIGHT);
+    }
+
     private Ui.Rect minus(int x, int y) { return new Ui.Rect(x, y, BUTTON, HEIGHT); }
     private Ui.Rect plus(int x, int y) { return new Ui.Rect(x + BUTTON + labelWidth, y, BUTTON, HEIGHT); }
 

@@ -23,7 +23,7 @@ public class HypaFlippaScreen extends Screen {
     @Override
     public void tick() {
         super.tick();
-        FlipperState.refreshIfStale();
+        MarketState.refreshIfStale();
     }
 
     @Override

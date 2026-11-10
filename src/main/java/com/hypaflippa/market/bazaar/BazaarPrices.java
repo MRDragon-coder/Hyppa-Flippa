@@ -1,4 +1,4 @@
-package com.hypaflippa;
+package com.hypaflippa.market.bazaar;
 
 import java.util.List;
 import java.util.OptionalDouble;
